@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Transcribe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --border: #222222;
+    --accent: #d4f57a;
+    --accent-dim: #a8c45e22;
+    --text: #e8e8e8;
+    --muted: #555555;
+    --danger: #f57a7a;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 48px 24px 80px;
+    min-height: 100vh;
+  }
+
+  /* subtle grid bg */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.3;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 680px;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+  }
+
+  header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .logo {
+    font-family: var(--sans);
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+  }
+
+  .tagline {
+    color: var(--muted);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* URL config */
+  .config-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .config-row label {
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+  }
+
+  .config-row input {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 8px 12px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .config-row input:focus { border-color: var(--accent); }
+  .config-row input::placeholder { color: var(--muted); }
+
+  /* Drop zone */
+  .dropzone {
+    border: 1px dashed var(--border);
+    background: var(--surface);
+    padding: 48px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+  }
+
+  .dropzone:hover, .dropzone.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .dropzone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .drop-icon {
+    font-size: 32px;
+    margin-bottom: 12px;
+    display: block;
+    color: var(--muted);
+  }
+
+  .drop-label {
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .drop-label strong {
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .file-name {
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  /* Button */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: var(--accent);
+    color: #0a0a0a;
+    border: none;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 12px 28px;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    transition: opacity 0.2s, transform 0.1s;
+    width: 100%;
+  }
+
+  .btn:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
+  .btn:active:not(:disabled) { transform: translateY(0); }
+  .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    width: auto;
+    padding: 8px 20px;
+    font-size: 12px;
+  }
+
+  .btn-ghost:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+
+  /* Status panel */
+  .status-panel {
+    display: none;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .status-panel.visible { display: flex; }
+
+  .status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .status-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+  }
+
+  .status-value {
+    font-size: 12px;
+    color: var(--accent);
+  }
+
+  /* Progress bar */
+  .progress-wrap {
+    height: 2px;
+    background: var(--border);
+    width: 100%;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.8s ease;
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  /* Live feed */
+  .live-feed {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 16px;
+    font-size: 12px;
+    color: var(--muted);
+    min-height: 64px;
+    max-height: 160px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .live-feed .feed-line {
+    color: var(--text);
+    opacity: 0;
+    animation: fadein 0.3s forwards;
+  }
+
+  .live-feed .feed-line span {
+    color: var(--muted);
+    margin-right: 8px;
+  }
+
+  @keyframes fadein {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Transcript output */
+  .transcript-panel {
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .transcript-panel.visible { display: flex; }
+
+  .transcript-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .transcript-title {
+    font-family: var(--sans);
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  .transcript-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 20px;
+    font-size: 12px;
+    line-height: 1.8;
+    color: var(--text);
+    max-height: 400px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+  .error-msg {
+    color: var(--danger);
+    font-size: 12px;
+    padding: 12px;
+    border: 1px solid var(--danger);
+    background: #f57a7a11;
+    display: none;
+  }
+
+  .error-msg.visible { display: block; }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+  }
+
+  .lang-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo">Transcribe</div>
+    <div class="tagline">local whisper — personal use</div>
+  </header>
+
+  <!-- Backend URL config -->
+  <div class="config-row">
+    <label>Backend</label>
+    <input type="text" id="backendUrl" placeholder="https://savior--whisper-transcribe-flask-app.modal.run" value="https://savior--whisper-transcribe-flask-app.modal.run" />
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- Drop zone -->
+  <div class="dropzone" id="dropzone">
+    <input type="file" id="fileInput" accept=".m4a,.mp3,.wav,.ogg,.flac,.mp4,.webm" />
+    <span class="drop-icon">&#9698;</span>
+    <div class="drop-label">Drop your audio file here or <strong>click to browse</strong></div>
+    <div class="file-name" id="fileName"></div>
+  </div>
+
+  <button class="btn" id="uploadBtn" disabled>Transcribe</button>
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <!-- Progress -->
+  <div class="status-panel" id="statusPanel">
+    <div class="status-row">
+      <span class="status-label">Status</span>
+      <span class="status-value" id="statusValue">Queued</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">Progress</span>
+      <span class="status-value" id="progressValue">0%</span>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+    <div class="live-feed" id="liveFeed">
+      <span style="color: var(--muted); font-size:11px;">Waiting for segments...</span>
+    </div>
+  </div>
+
+  <!-- Transcript result -->
+  <div class="transcript-panel" id="transcriptPanel">
+    <div class="transcript-header">
+      <span class="transcript-title">Transcript</span>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span class="lang-badge" id="langBadge"></span>
+        <button class="btn btn-ghost" id="copyBtn">Copy</button>
+        <button class="btn btn-ghost" id="downloadBtn">Download .txt</button>
+      </div>
+    </div>
+    <div class="transcript-box" id="transcriptBox"></div>
+  </div>
+
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  let selectedFile = null;
+  let transcriptText = '';
+
+  // Drag and drop
+  const dropzone = $('dropzone');
+  const fileInput = $('fileInput');
+
+  dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropzone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) setFile(file);
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) setFile(fileInput.files[0]);
+  });
+
+  function setFile(file) {
+    selectedFile = file;
+    $('fileName').textContent = file.name;
+    $('uploadBtn').disabled = false;
+  }
+
+  // Upload + stream
+  $('uploadBtn').addEventListener('click', async () => {
+    const backend = $('backendUrl').value.trim().replace(/\/$/, '');
+    if (!backend) { showError('Paste your ngrok backend URL first.'); return; }
+    if (!selectedFile) { showError('Select an audio file first.'); return; }
+
+    hideError();
+    $('uploadBtn').disabled = true;
+    $('statusPanel').classList.add('visible');
+    $('transcriptPanel').classList.remove('visible');
+    $('liveFeed').innerHTML = '<span style="color:var(--muted);font-size:11px;">Uploading...</span>';
+    setProgress(0, 'Uploading');
+
+    try {
+      const form = new FormData();
+      form.append('file', selectedFile);
+
+      const res = await fetch(`${backend}/upload`, { method: 'POST', body: form });
+      if (!res.ok) throw new Error(`Upload failed: ${res.statusText}`);
+      const { job_id } = await res.json();
+
+      $('liveFeed').innerHTML = '';
+      setProgress(0, 'Transcribing');
+      startSSE(backend, job_id);
+
+    } catch (err) {
+      showError(err.message);
+      $('uploadBtn').disabled = false;
+    }
+  });
+
+  function startSSE(backend, jobId) {
+    const es = new EventSource(`${backend}/stream/${jobId}`);
+
+    es.onmessage = async e => {
+      const data = JSON.parse(e.data);
+
+      if (data.error) { showError(data.error); es.close(); $('uploadBtn').disabled = false; return; }
+
+      setProgress(data.progress, capitalize(data.status));
+
+      if (data.language && $('langBadge').textContent === '') {
+        $('langBadge').textContent = data.language;
+      }
+
+      if (data.latest_line) {
+        appendFeedLine(data.latest_line);
+      }
+
+      if (data.status === 'done') {
+        es.close();
+        const result = await fetch(`${backend}/result/${jobId}`).then(r => r.json());
+        transcriptText = result.transcript;
+        $('transcriptBox').textContent = transcriptText;
+        $('transcriptPanel').classList.add('visible');
+        $('uploadBtn').disabled = false;
+        $('uploadBtn').textContent = 'Transcribe Another';
+        setProgress(100, 'Done');
+      }
+
+      if (data.status === 'error') {
+        es.close();
+        showError('Transcription failed on the backend. Check Colab logs.');
+        $('uploadBtn').disabled = false;
+      }
+    };
+
+    es.onerror = () => {
+      es.close();
+      showError('Lost connection to backend. Is Colab still running?');
+      $('uploadBtn').disabled = false;
+    };
+  }
+
+  function setProgress(pct, label) {
+    $('progressFill').style.width = pct + '%';
+    $('progressValue').textContent = pct + '%';
+    $('statusValue').textContent = label;
+  }
+
+  function appendFeedLine(line) {
+    const feed = $('liveFeed');
+    // parse timestamp from line like "[12.34s --> 15.67s] text"
+    const match = line.match(/^\[(.+?)\]\s(.+)$/);
+    const div = document.createElement('div');
+    div.className = 'feed-line';
+    if (match) {
+      div.innerHTML = `<span>${match[1]}</span>${match[2]}`;
+    } else {
+      div.textContent = line;
+    }
+    feed.appendChild(div);
+    feed.scrollTop = feed.scrollHeight;
+  }
+
+  function showError(msg) {
+    $('errorMsg').textContent = msg;
+    $('errorMsg').classList.add('visible');
+  }
+
+  function hideError() {
+    $('errorMsg').classList.remove('visible');
+  }
+
+  function capitalize(str) {
+    return str ? str[0].toUpperCase() + str.slice(1) : '';
+  }
+
+  // Copy
+  $('copyBtn').addEventListener('click', () => {
+    navigator.clipboard.writeText(transcriptText);
+    $('copyBtn').textContent = 'Copied!';
+    setTimeout(() => $('copyBtn').textContent = 'Copy', 2000);
+  });
+
+  // Download
+  $('downloadBtn').addEventListener('click', () => {
+    const blob = new Blob([transcriptText], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const base = selectedFile ? selectedFile.name.replace(/\.[^.]+$/, '') : 'transcript';
+    a.download = `${base}_transcript.txt`;
+    a.click();
+  });
+</script>
+</body>
+</html>
